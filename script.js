@@ -1,226 +1,216 @@
 // made by jeff
 
-var canvas, gfx;
-var canvasWidth = 600, canvasHeight = 600;
+function Minesweeper() {
+  window._this = this;
+  this.setup = function () {
+    // get canvas context
+    this.canvas = document.getElementById("game");
+    this.canvasWidth = 600, this.canvasHeight = 600;
+    this.gfx = this.canvas.getContext("2d");
+    this.fieldWidth = 25, this.fieldHeight = 25; // match this w/h ratio to canvas' for square mines.
+    this.generatedMines = 1;
+    this.minesFlagged = 0;
 
-var infoParagraph; // reference to info p element
+    this.gameOver = false;
+    this.won = false;
+    this.flagging = false; // if flagging is currently enabled.
 
-const fieldWidth = 25, fieldHeight = 25; // match this w/h ratio to canvas' for square mines.
-var generatedMines;
+    this.infoParagraph = document.getElementById("info");
+    this.infoParagraph.innerHTML = `<b>${this.fieldWidth}x${this.fieldHeight}</b> with <b>${this.generatedMines} mine${this.generatedMines != 1 ? "s" : ""}.</b>`
 
-var mineWidth, mineHeight;
+    //determine mine dimensions
+    this.mineWidth = Math.floor(this.canvasWidth / this.fieldWidth); // use floor() because float math can leave gaps between
+    this.mineHeight = Math.floor(this.canvasHeight / this.fieldHeight);
 
-// 0=no mine here or adjacent, 1-8 mine adjacent, <9 is a mine
-var field; // variable for array for field
-var searched;
-var flagged;
+    this.textSize = Math.floor(this.mineHeight * 0.7);
+    this.mineRadius = Math.ceil(this.mineHeight * 0.25);
+    this.flagGap = Math.ceil(this.mineHeight * 0.2);
 
-var textSize, mineRadius, flagGap;
+    this.gfx.textBaseline = "middle";
+    this.gfx.textAlign = "center";
+    this.gfx.font = `bold ${this.textSize}px sans-serif`;
 
-var gameOver = false;
-var won = false;
-var flagging = false; // if flagging is currently enabled.
+    this.gameOver = false;
+    this.wonGame = false;
 
-var minesFlagged;
+    // clear background
+    this.gfx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
+    this.generateField(); // gen field
 
-function setup() {
-  // get canvas context
-  canvas = document.getElementById("game");
-  gfx = canvas.getContext("2d");
-  generatedMines = 100;
-  minesFlagged = 0;
+    this.game = this;
 
-  infoParagraph = document.getElementById("info");
-  infoParagraph.innerHTML = `<b>${fieldWidth}x${fieldHeight}</b> with <b>${generatedMines} mines</b>`
-
-  //determine mine dimensions
-  mineWidth = Math.floor(canvasWidth / fieldWidth); // use floor() because float math can leave gaps between
-  mineHeight = Math.floor(canvasHeight / fieldHeight);
-
-  textSize = Math.floor(mineHeight * 0.7);
-  mineRadius = Math.ceil(textSize * 0.35);
-  flagGap = Math.ceil(textSize * 0.2);
-
-  gfx.textBaseline = "middle";
-  gfx.textAlign = "center";
-  gfx.font = `bold ${textSize}px sans-serif`;
-
-  gameOver = false;
-  wonGame = false;
-
-  // clear background
-  gfx.clearRect(0, 0, canvasWidth, canvasHeight);
-  generateField(); // gen field
-
-  canvas.addEventListener("click", mouseClicked);
-}
-
-function generateField() { // width, height, and number of mines
-  field = [];
-  searched = [];
-  flagged = [];
-  var totalSize = fieldWidth * fieldHeight;
-  var minesLeft = generatedMines; // mines left to generate
-  if (generatedMines >= totalSize) {
-    alert("Too many mines for current size of field");
-    return;
+    document.addEventListener("keypress", this.keyResponse);
+    this.canvas.addEventListener("click", this.mouseClicked);
   }
-  var x, y; // x and y coordinates for the below for loop.
-  for (var i = 0; i < totalSize; i++) {
-    field[i] = 0;
-    searched[i] = false;
-    flagged[i] = false;
-    x = i % fieldWidth;
-    y = Math.floor(i / fieldWidth);
-    gfx.fillStyle = (x + (y % 2)) % 2 == 0 ? "#555555" : "#666666";
-    gfx.fillRect(x * mineWidth,
-      y * mineHeight,
-      mineWidth,
-      mineHeight);
-  }
-  while (minesLeft > 0) { // loop to place all mines
-    var rx = Math.floor(Math.random() * fieldWidth);
-    var ry = Math.floor(Math.random() * fieldHeight);
-    var idx = ry * fieldWidth + rx; // find a random coordinate within field
-    if (field[idx] < 9) {
-      field[idx] += 9; // arithmetically place mine?
-      incrementAdjacent(idx);
-      minesLeft--; // mine has been placed
+
+  this.generateField = function () { // width, height, and number of mines
+    this.field = [];
+    this.searched = [];
+    this.flagged = [];
+    var totalSize = this.fieldWidth * this.fieldHeight;
+    var minesLeft = this.generatedMines; // mines left to generate
+    if (this.generatedMines >= totalSize) {
+      alert("Too many mines for current size of field");
+      return;
     }
-  }
-}
-
-function incrementAdjacent(idx) { // tool for generating mines that checks the bounds of the field.
-  var x = getFieldX(idx), y = getFieldY(idx);
-  var xp = x < fieldWidth - 1, xn = x > 0; // x +/- available
-  var yp = y < fieldHeight - 1, yn = y > 0; // y +/- availableif (xn&&yp) searchCell(x-1,y+1);
-  if (xp && yp) field[getFieldIDX(x + 1, y + 1)]++;
-  if (xn && yp) field[getFieldIDX(x - 1, y + 1)]++;
-  if (xp && yn) field[getFieldIDX(x + 1, y - 1)]++;
-  if (xn && yn) field[getFieldIDX(x - 1, y - 1)]++;
-  if (xp) field[getFieldIDX(x + 1, y)]++;
-  if (xn) field[getFieldIDX(x - 1, y)]++;
-  if (yp) field[getFieldIDX(x, y + 1)]++;
-  if (yn) field[getFieldIDX(x, y - 1)]++;
-}
-
-function mouseClicked(me) { // mouseevent argument
-  if (!gameOver) {
-    if (!flagging) {
-      searchCell(Math.floor(me.offsetX / mineWidth),
-        Math.floor(me.offsetY / mineHeight), true);
-    } else {
-      flagCell(Math.floor(me.offsetX / mineWidth),
-        Math.floor(me.offsetY / mineHeight));
+    var x, y; // x and y coordinates for the below for loop.
+    for (var i = 0; i < totalSize; i++) {
+      this.field[i] = 0;
+      this.searched[i] = false;
+      this.flagged[i] = false;
+      x = i % this.fieldWidth;
+      y = Math.floor(i / this.fieldWidth);
+      this.gfx.fillStyle = (x + (y % 2)) % 2 == 0 ? "#555555" : "#666666";
+      this.gfx.fillRect(x * this.mineWidth,
+        y * this.mineHeight,
+        this.mineWidth,
+        this.mineHeight);
     }
-  }
-}
-
-function getFieldIDX(x, y) {
-  return y * fieldWidth + x;
-}
-
-function getFieldX(idx) {
-  return (idx % fieldWidth);
-}
-
-function getFieldY(idx) {
-  return Math.floor(idx / fieldWidth);
-}
-
-function flagCell(x, y) {
-  var idx = getFieldIDX(x, y);
-  if (!searched[idx]) {
-    flagged[idx] = !flagged[idx];
-    drawFlagStatus(x, y, flagged[idx]);
-    if (field[idx] > 8) {
-      if (flagged[idx]) {
-        minesFlagged++;
-        if (minesFlagged >= generatedMines) {
-          wonGame = true;
-          endGame();
-        }
-      } else {
-        minesFlagged--;
+    while (minesLeft > 0) { // loop to place all mines
+      var rx = Math.floor(Math.random() * this.fieldWidth);
+      var ry = Math.floor(Math.random() * this.fieldHeight);
+      var idx = ry * this.fieldWidth + rx; // find a random coordinate within field
+      if (this.field[idx] < 9) {
+        this.field[idx] += 9; // arithmetically place mine?
+        this.incrementAdjacent(idx);
+        minesLeft--; // mine has been placed
       }
     }
   }
-}
 
-function drawFlagStatus(x, y, status) {
-  gfx.fillStyle = (x + (y % 2)) % 2 == 0 ? "#555555" : "#666666";
-  gfx.fillRect(x * mineWidth,
-    y * mineHeight,
-    mineWidth,
-    mineHeight);
-  if (status) {
-    gfx.fillStyle = "#00CC00";
-    gfx.fillRect(x * mineWidth + flagGap,
-      y * mineHeight + flagGap,
-      mineWidth - flagGap * 2,
-      mineHeight - flagGap * 2);
+  this.incrementAdjacent = function (idx) { // tool for generating mines that checks the bounds of the field.
+    var x = this.getFieldX(idx), y = this.getFieldY(idx);
+    var xp = x < this.fieldWidth - 1, xn = x > 0; // x +/- available
+    var yp = y < this.fieldHeight - 1, yn = y > 0; // y +/- availableif (xn&&yp) searchCell(x-1,y+1);
+    if (xp && yp) this.field[this.getFieldIDX(x + 1, y + 1)]++;
+    if (xn && yp) this.field[this.getFieldIDX(x - 1, y + 1)]++;
+    if (xp && yn) this.field[this.getFieldIDX(x + 1, y - 1)]++;
+    if (xn && yn) this.field[this.getFieldIDX(x - 1, y - 1)]++;
+    if (xp) this.field[this.getFieldIDX(x + 1, y)]++;
+    if (xn) this.field[this.getFieldIDX(x - 1, y)]++;
+    if (yp) this.field[this.getFieldIDX(x, y + 1)]++;
+    if (yn) this.field[this.getFieldIDX(x, y - 1)]++;
   }
-}
 
-function searchCell(x, y, manual = false) {
-  var idx = getFieldIDX(x, y);
-  if (!searched[idx] && !flagged[idx]) {
-    if (field[idx] <= 0) {
-      searched[idx] = true;
-      gfx.fillStyle = "#FFFFFF";
-      gfx.fillRect(x * mineWidth, y * mineHeight, mineWidth, mineHeight);
-      var xp = x < fieldWidth - 1, xn = x > 0; // x +/- available
-      var yp = y < fieldHeight - 1, yn = y > 0; // y +/- available
-      if (xn && yp) searchCell(x - 1, y + 1);
-      if (xp && yp) searchCell(x + 1, y + 1);
-      if (xn && yn) searchCell(x - 1, y - 1);
-      if (xp && yn) searchCell(x + 1, y - 1);
-      if (xp) searchCell(x + 1, y);
-      if (xn) searchCell(x - 1, y);
-      if (yp) searchCell(x, y + 1);
-      if (yn) searchCell(x, y - 1);
-    } else if (field[idx] < 9) {
-      searched[idx] = true;
-      gfx.fillStyle = "#FFFFFF";
-      gfx.fillRect(x * mineWidth, y * mineHeight, mineWidth, mineHeight);
-      gfx.fillStyle = "#000000";
-      gfx.fillText(field[idx], (x + 0.5) * mineWidth, (y + 0.5) * mineHeight);
-    } else if (manual) {
-      searched[idx] = true;
-      gfx.fillStyle = "#FFFFFF";
-      gfx.fillRect(x * mineWidth, y * mineHeight, mineWidth, mineHeight);
-      gfx.fillStyle = "#FF0000";
-      gfx.beginPath();
-      gfx.ellipse((x + 0.5) * mineWidth, (y + 0.5) * mineHeight, mineRadius,
-        mineRadius, 0, 0, 2 * Math.PI);
-      gfx.fill();
-      wonGame = false;
-      endGame();
+  this.mouseClicked = function (me) { // mouseevent argument
+    if (!_this.gameOver) {
+      if (!_this.flagging) {
+        _this.searchCell(Math.floor(me.offsetX / _this.mineWidth),
+          Math.floor(me.offsetY / _this.mineHeight), true);
+      } else {
+        _this.flagCell(Math.floor(me.offsetX / _this.mineWidth),
+          Math.floor(me.offsetY / _this.mineHeight));
+      }
+    }
+  }
+
+  this.getFieldIDX = function (x, y) {
+    return y * this.fieldWidth + x;
+  }
+
+  this.getFieldX = function (idx) {
+    return (idx % this.fieldWidth);
+  }
+
+  this.getFieldY = function (idx) {
+    return Math.floor(idx / this.fieldWidth);
+  }
+
+  this.flagCell = function (x, y) {
+    var idx = this.getFieldIDX(x, y);
+    if (!this.searched[idx]) {
+      this.flagged[idx] = !this.flagged[idx];
+      this.drawFlagStatus(x, y, this.flagged[idx]);
+      if (this.field[idx] > 8) {
+        if (this.flagged[idx]) {
+          this.minesFlagged++;
+          if (this.minesFlagged == this.generatedMines) {
+            this.wonGame = true;
+            this.endGame();
+          }
+        } else {
+          this.minesFlagged--;
+        }
+      }
+    }
+  }
+
+  this.drawFlagStatus = function (x, y, status) {
+    this.gfx.fillStyle = (x + (y % 2)) % 2 == 0 ? "#555555" : "#666666";
+    this.gfx.fillRect(x * this.mineWidth,
+      y * this.mineHeight,
+      this.mineWidth,
+      this.mineHeight);
+    if (status) {
+      this.gfx.fillStyle = "#00CC00";
+      this.gfx.fillRect(x * this.mineWidth + this.flagGap,
+        y * this.mineHeight + this.flagGap,
+        this.mineWidth - this.flagGap * 2,
+        this.mineHeight - this.flagGap * 2);
+    }
+  }
+
+  this.searchCell = function (x, y, manual = false) {
+    var idx = this.getFieldIDX(x, y);
+    if (!this.searched[idx] && !this.flagged[idx]) {
+      if (this.field[idx] <= 0) {
+        this.searched[idx] = true;
+        this.gfx.fillStyle = "#FFFFFF";
+        this.gfx.fillRect(x * this.mineWidth, y * this.mineHeight, this.mineWidth, this.mineHeight);
+        var xp = x < this.fieldWidth - 1, xn = x > 0; // x +/- available
+        var yp = y < this.fieldHeight - 1, yn = y > 0; // y +/- available
+        if (xn && yp) this.searchCell(x - 1, y + 1);
+        if (xp && yp) this.searchCell(x + 1, y + 1);
+        if (xn && yn) this.searchCell(x - 1, y - 1);
+        if (xp && yn) this.searchCell(x + 1, y - 1);
+        if (xp) this.searchCell(x + 1, y);
+        if (xn) this.searchCell(x - 1, y);
+        if (yp) this.searchCell(x, y + 1);
+        if (yn) this.searchCell(x, y - 1);
+      } else if (this.field[idx] < 9) {
+        this.searched[idx] = true;
+        this.gfx.fillStyle = "#FFFFFF";
+        this.gfx.fillRect(x * this.mineWidth, y * this.mineHeight, this.mineWidth, this.mineHeight);
+        this.gfx.fillStyle = "#000000";
+        this.gfx.fillText(this.field[idx], (x + 0.5) * this.mineWidth, (y + 0.5) * this.mineHeight);
+      } else if (manual) {
+        this.searched[idx] = true;
+        this.gfx.fillStyle = "#FFFFFF";
+        this.gfx.fillRect(x * this.mineWidth, y * this.mineHeight, this.mineWidth, this.mineHeight);
+        this.gfx.fillStyle = "#FF0000";
+        this.gfx.beginPath();
+        this.gfx.ellipse((x + 0.5) * this.mineWidth, (y + 0.5) * this.mineHeight, this.mineRadius,
+          this.mineRadius, 0, 0, 2 * Math.PI);
+        this.gfx.fill();
+        this.wonGame = false;
+        this.endGame();
+      }
+    }
+  }
+
+  this.endGame = function () {
+    this.gameOver = true;
+    this.gfx.fillStyle = this.wonGame ? "#00AA00" : "#AA0000";
+    this.gfx.fillText(`YOU HAVE ${this.wonGame ? "WON" : "LOST"} THE GAME!`, this.canvasWidth / 2, this.canvasHeight / 2 - this.textSize * 2);
+    this.gfx.fillText("PRESS R TO PLAY AGAIN", this.canvasWidth / 2, this.canvasHeight / 2 + this.textSize * 2);
+  }
+
+  this.keyResponse = function (e) {
+    if (e.code == "KeyR") {
+      _this.gameOver = false;
+      _this.setup();
+    }
+    if (e.code == "KeyI" && !_this.gameOver) {
+      _this.flagging = !_this.flagging;
+      if (_this.flagging)
+        document.body.style.backgroundColor = "darkgreen";
+      else
+        document.body.style.backgroundColor = "darkred";
     }
   }
 }
-
-function endGame() {
-  gameOver = true;
-  gfx.fillStyle = wonGame ? "#00AA00" : "#AA0000";
-  gfx.fillText(`YOU HAVE ${wonGame ? "WON" : "LOST"} THE GAME!`, canvasWidth / 2, canvasHeight / 2 - textSize * 2);
-  gfx.fillText("PRESS R TO PLAY AGAIN", canvasWidth / 2, canvasHeight / 2 + textSize * 2);
+var minesweeper = new Minesweeper();
+function start() {
+  minesweeper.setup();
 }
-
-function keyResponse(e) {
-  if (e.code == "KeyR") {
-    gameOver = false;
-    setup();
-  }
-  if (e.code == "KeyI" && !gameOver) {
-    flagging = !flagging;
-    if (flagging)
-      document.body.style.backgroundColor = "darkgreen";
-    else
-      document.body.style.backgroundColor = "darkred";
-  }
-}
-
-document.addEventListener("keypress", keyResponse)
-
-window.addEventListener("load", setup);
+window.addEventListener("load", start);
