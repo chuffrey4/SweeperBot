@@ -38,9 +38,6 @@ function Minesweeper() {
     this.generateField(); // gen field
 
     this.game = this;
-
-    document.addEventListener("keypress", this.keyResponse);
-    this.canvas.addEventListener("click", this.mouseClicked);
   }
 
   this.generateField = function () { // width, height, and number of mines
@@ -92,14 +89,12 @@ function Minesweeper() {
     if (yn) this.field[this.getFieldIDX(x, y - 1)]++;
   }
 
-  this.mouseClicked = function (me) { // mouseevent argument
-    if (!_this.gameOver) {
-      if (!_this.flagging) {
-        _this.searchCell(Math.floor(me.offsetX / _this.mineWidth),
-          Math.floor(me.offsetY / _this.mineHeight), true);
+  this.triggerCell = function (x,y) { // tool for bot argument
+    if (!this.gameOver) {
+      if (!this.flagging) {
+        this.searchCell(x,y, true);
       } else {
-        _this.flagCell(Math.floor(me.offsetX / _this.mineWidth),
-          Math.floor(me.offsetY / _this.mineHeight));
+        this.flagCell(x,y);
       }
     }
   }
@@ -195,21 +190,20 @@ function Minesweeper() {
     this.gfx.fillText("PRESS R TO PLAY AGAIN", this.canvasWidth / 2, this.canvasHeight / 2 + this.textSize * 2);
   }
 
-  this.keyResponse = function (e) {
-    if (e.code == "KeyR") {
-      _this.gameOver = false;
-      _this.setup();
-    }
-    if (e.code == "KeyI" && !_this.gameOver) {
-      _this.flagging = !_this.flagging;
-      if (_this.flagging)
-        document.body.style.backgroundColor = "darkgreen";
-      else
-        document.body.style.backgroundColor = "darkred";
-    }
+  this.restart = function () {
+    this.gameOver = false;
+    this.setup();
+  }
+  this.enableFlagging = function () {
+    this.flagging = false;
+    document.body.style.backgroundColor = "darkgreen";
+  }
+  this.disableFlagging = function () {
+    this.flagging = false;
+    document.body.style.backgroundColor = "darkred";
   }
 }
-var minesweeper = new Minesweeper();
+window.minesweeper = new Minesweeper();
 function start() {
   minesweeper.setup();
 }
