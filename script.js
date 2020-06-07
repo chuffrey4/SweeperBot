@@ -196,11 +196,11 @@ function Minesweeper() {
   }
   this.enableFlagging = function () {
     this.flagging = true;
-    document.body.style.backgroundColor = "darkgreen";
+    //document.body.style.backgroundColor = "darkgreen";
   }
   this.disableFlagging = function () {
     this.flagging = false;
-    document.body.style.backgroundColor = "darkred";
+    //document.body.style.backgroundColor = "darkred";
   }
 }
 
